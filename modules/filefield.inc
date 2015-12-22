@@ -59,7 +59,7 @@ function filefield_filefield_paths_get_fields(&$node, &$ffp) {
               ? TRUE
               : FALSE
           );
-          if (is_array($file['data']['process'])) {
+          if (isset($file['data']['process']) && is_array($file['data']['process'])) {
             unset($file['data']['process']);
           }
 

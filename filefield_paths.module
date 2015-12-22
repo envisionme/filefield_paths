@@ -390,7 +390,8 @@ function filefield_paths_node_update(&$node) {
       // Invoke hook_filefield_paths_process_file().
       foreach (module_implements('filefield_paths_process_file') as $module) {
         $function = "{$module}_filefield_paths_process_file";
-        $function(($file['new'] || variable_get("ffp_{$node->type}_{$file['name']}", 0)), $file, $ffp['#settings'][$file['name']], $node, $update);
+        $settings = isset($ffp['#settings'][$file['name']]) ? $ffp['#settings'][$file['name']] : array();
+        $function(($file['new'] || variable_get("ffp_{$node->type}_{$file['name']}", 0)), $file, $settings, $node, $update);
       }
     }
 
@@ -412,7 +413,7 @@ function filefield_paths_node_update(&$node) {
     }
 
     // Cleanup temporary paths.
-    if ($ffp['#settings']) {
+    if (isset($ffp['#settings'])) {
       foreach ($ffp['#settings'] as $name => $field) {
         $paths = explode('/', $field['filepath']['value']);
         filefield_paths_cleanup_temp($paths);
@@ -489,7 +490,8 @@ function filefield_paths_filefield_paths_process_file($new, &$file, $settings, &
   if ($new && !empty($file['field']['filename'])) {
     // Process filename
     $file['filename']['old'] = $file['field']['filename'];
-    if (($file['filename']['new'] = $settings['filename']['value']) != '') {
+    if (!empty($settings['filename']['value'])) {
+      $file['filename']['new'] = $settings['filename']['value'];
       $file['filename']['new'] = filefield_paths_process_string($file['filename']['new'], 'node', $node, $settings['filename']);
       $file['filename']['new'] = filefield_paths_process_string($file['filename']['new'], 'field', array(0 => $file['field']), $settings['filename']);
     }
@@ -499,8 +501,13 @@ function filefield_paths_filefield_paths_process_file($new, &$file, $settings, &
 
     // Process filepath
     $file['filepath']['old'] = $file['field']['filepath'];
-    $file['filepath']['new'] = filefield_paths_process_string(file_directory_path() . "/{$settings['filepath']['value']}/{$file['filename']['new']}", 'node', $node, $settings['filepath']);
-    $file['filepath']['new'] = filefield_paths_process_string($file['filepath']['new'], 'field', array(0 => $file['field']), $settings['filepath']);
+    if (!empty($settings['filepath']['value'])) {
+      $file['filepath']['new'] = filefield_paths_process_string(file_directory_path() . "/{$settings['filepath']['value']}/{$file['filename']['new']}", 'node', $node, $settings['filepath']);
+      $file['filepath']['new'] = filefield_paths_process_string($file['filepath']['new'], 'field', array(0 => $file['field']), $settings['filepath']);
+    }
+    else {
+      $file['filepath']['new'] = $file['field']['filepath'];
+    }
 
     // Finalize files if necessary
     if (dirname($file['filepath']['new']) != dirname($file['field']['filepath']) || $file['filename']['new'] != $file['field']['filename']) {
@@ -604,9 +611,9 @@ function filefield_paths_token_list($type = 'all') {
  * Implements hook_token_values().
  */
 function filefield_paths_token_values($type, $object = NULL) {
-  if ($type == 'field') {
+  $tokens = array();
+  if ($type == 'field' && isset($object[0]['filename'])) {
     $item = pathinfo($object[0]['filename']);
-    $tokens = array();
     if (!module_exists('filefield')) {
       // PHP < 5.2: pathinfo() doesn't return 'filename' variable.
       $tokens['filefield-onlyname'] = isset($item['filename'])
@@ -636,8 +643,8 @@ function filefield_paths_token_values($type, $object = NULL) {
         ? ".{$object[0]['type']}"
         : '';
     }
-    return $tokens;
   }
+  return $tokens;
 }
 
 /**
